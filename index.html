@@ -108,6 +108,11 @@
       background: #e9e9e9;
       color: #222;
     }
+
+    .aguardando {
+      background: #fff4cc;
+      color: #765900;
+    }
   </style>
 </head>
 
@@ -122,6 +127,7 @@
     </div>
 
     <label for="operador">Nome do operador</label>
+
     <input
       type="text"
       id="operador"
@@ -129,6 +135,7 @@
     >
 
     <label for="pin">PIN do evento</label>
+
     <input
       type="password"
       id="pin"
@@ -163,10 +170,22 @@
 
   </div>
 
+
   <script>
+
+    /*
+     * ENDEREÇO DO WEB APP DO APPS SCRIPT
+     */
+    const URL_APPS_SCRIPT =
+      "https://script.google.com/macros/s/AKfycbzUmfsUcAQDawhybTWKSSOye5FDvCYDaCY2uKbyL7eCFp6EzIsbVJCQ6lq3102YSqTQng/exec";
+
 
     let leitor = null;
 
+
+    /*
+     * Verifica se operador e PIN foram preenchidos.
+     */
     function dadosPreenchidos() {
 
       const operador =
@@ -175,66 +194,103 @@
       const pin =
         document.getElementById('pin').value.trim();
 
+
       if (!operador) {
-        mostrarResultado(false, 'Digite o nome do operador.');
+
+        mostrarResultado(
+          false,
+          'Digite o nome do operador.'
+        );
+
         return false;
       }
 
+
       if (!pin) {
-        mostrarResultado(false, 'Digite o PIN do evento.');
+
+        mostrarResultado(
+          false,
+          'Digite o PIN do evento.'
+        );
+
         return false;
       }
+
 
       return true;
     }
 
 
+    /*
+     * Ativa a câmera.
+     */
     function ativarCamera() {
 
       if (!dadosPreenchidos()) {
         return;
       }
 
+
       if (leitor) {
-        mostrarResultado(false, 'A câmera já está ativa.');
+
+        mostrarResultado(
+          false,
+          'A câmera já está ativa.'
+        );
+
         return;
       }
 
+
       leitor = new Html5Qrcode("reader");
 
+
       leitor.start(
+
         { facingMode: "environment" },
 
         {
           fps: 10,
+
           qrbox: {
             width: 250,
             height: 250
           }
         },
 
+
         codigo => {
 
-          console.log("QR LIDO:", codigo);
-
-          mostrarResultado(
-            true,
-            "QR Code lido com sucesso: " + codigo
+          console.log(
+            "QR LIDO:",
+            codigo
           );
+
 
           pararCamera();
 
+
+          enviarCheckin(codigo);
+
         },
 
+
         erro => {
+
           // Erros normais de leitura são ignorados.
+
         }
 
       ).catch(erro => {
 
-        console.error("ERRO DA CÂMERA:", erro);
+        console.error(
+          "ERRO DA CÂMERA:",
+          erro
+        );
+
 
         leitor = null;
+
 
         mostrarResultado(
           false,
@@ -242,60 +298,489 @@
         );
 
       });
+
     }
 
 
+    /*
+     * Para a câmera.
+     */
     function pararCamera() {
 
       if (!leitor) {
         return;
       }
 
+
       leitor.stop()
+
         .then(() => {
+
           leitor.clear();
+
           leitor = null;
+
         })
+
         .catch(erro => {
-          console.error("Erro ao parar câmera:", erro);
+
+          console.error(
+            "Erro ao parar câmera:",
+            erro
+          );
+
         });
 
     }
 
 
-    function testarCodigoManual() {
+    /*
+     * Faz o check-in.
+     *
+     * O POST é enviado para o Apps Script
+     * através de um formulário invisível.
+     *
+     * Depois consultamos o resultado através
+     * de JSONP.
+     */
+    function enviarCheckin(codigo) {
 
-      const codigo =
-        document.getElementById('codigoManual').value.trim();
+      const operador =
+        document
+          .getElementById('operador')
+          .value
+          .trim();
+
+
+      const pin =
+        document
+          .getElementById('pin')
+          .value
+          .trim();
+
 
       if (!codigo) {
+
         mostrarResultado(
           false,
-          "Digite um código."
+          'QR Code não identificado.'
         );
 
         return;
       }
 
-      mostrarResultado(
-        true,
-        "Código recebido: " + codigo
+
+      const requestId =
+        'req_' +
+        Date.now() +
+        '_' +
+        Math.random()
+          .toString(36)
+          .substring(2, 10);
+
+
+      mostrarResultadoAguardando(
+        '⏳ Registrando check-in...'
+      );
+
+
+      /*
+       * Cria um iframe invisível para receber
+       * a resposta do POST sem sair da página.
+       */
+      const iframe =
+        document.createElement('iframe');
+
+
+      iframe.name =
+        'iframeCheckin_' + requestId;
+
+
+      iframe.style.display =
+        'none';
+
+
+      document.body.appendChild(
+        iframe
+      );
+
+
+      /*
+       * Cria o formulário.
+       */
+      const formulario =
+        document.createElement('form');
+
+
+      formulario.method =
+        'POST';
+
+
+      formulario.action =
+        URL_APPS_SCRIPT;
+
+
+      formulario.target =
+        iframe.name;
+
+
+      formulario.style.display =
+        'none';
+
+
+      adicionarCampo(
+        formulario,
+        'codigo',
+        codigo
+      );
+
+
+      adicionarCampo(
+        formulario,
+        'pin',
+        pin
+      );
+
+
+      adicionarCampo(
+        formulario,
+        'operador',
+        operador
+      );
+
+
+      adicionarCampo(
+        formulario,
+        'requestId',
+        requestId
+      );
+
+
+      document.body.appendChild(
+        formulario
+      );
+
+
+      /*
+       * Envia o check-in.
+       */
+      formulario.submit();
+
+
+      /*
+       * Começa a procurar o resultado.
+       */
+      consultarResultado(
+        requestId,
+        formulario,
+        iframe
       );
 
     }
 
 
-    function mostrarResultado(sucesso, mensagem) {
+    /*
+     * Adiciona um campo ao formulário.
+     */
+    function adicionarCampo(
+      formulario,
+      nome,
+      valor
+    ) {
+
+      const campo =
+        document.createElement('input');
+
+
+      campo.type =
+        'hidden';
+
+
+      campo.name =
+        nome;
+
+
+      campo.value =
+        valor;
+
+
+      formulario.appendChild(
+        campo
+      );
+
+    }
+
+
+    /*
+     * Consulta o resultado do check-in.
+     */
+    function consultarResultado(
+      requestId,
+      formulario,
+      iframe
+    ) {
+
+      let tentativas = 0;
+
+      const limiteTentativas = 30;
+
+
+      const nomeCallback =
+        'receberResultado_' +
+        Date.now() +
+        '_' +
+        Math.random()
+          .toString(36)
+          .substring(2, 8);
+
+
+      window[nomeCallback] =
+        function(resultado) {
+
+          limparConsulta(
+            formulario,
+            iframe,
+            nomeCallback
+          );
+
+
+          if (!resultado || !resultado.pronto) {
+
+            mostrarResultado(
+              false,
+              'Não foi possível obter o resultado do check-in.'
+            );
+
+            return;
+          }
+
+
+          mostrarResultado(
+            resultado.sucesso,
+            resultado.mensagem
+          );
+
+        };
+
+
+      function consultar() {
+
+        tentativas++;
+
+
+        if (tentativas > limiteTentativas) {
+
+          limparConsulta(
+            formulario,
+            iframe,
+            nomeCallback
+          );
+
+
+          mostrarResultado(
+            false,
+            'O servidor demorou para responder. Verifique a conexão e tente novamente.'
+          );
+
+
+          return;
+        }
+
+
+        const script =
+          document.createElement('script');
+
+
+        script.src =
+          URL_APPS_SCRIPT +
+          '?acao=resultado' +
+          '&requestId=' +
+          encodeURIComponent(requestId) +
+          '&callback=' +
+          encodeURIComponent(nomeCallback) +
+          '&t=' +
+          Date.now();
+
+
+        script.onerror =
+          function() {
+
+            script.remove();
+
+            setTimeout(
+              consultar,
+              1000
+            );
+
+          };
+
+
+        document.body.appendChild(
+          script
+        );
+
+
+        setTimeout(
+          function() {
+
+            if (script.parentNode) {
+              script.remove();
+            }
+
+          },
+          2000
+        );
+
+      }
+
+
+      /*
+       * Dá um pequeno intervalo para o POST
+       * chegar ao Apps Script.
+       */
+      setTimeout(
+        consultar,
+        800
+      );
+
+    }
+
+
+    /*
+     * Limpa elementos temporários.
+     */
+    function limparConsulta(
+      formulario,
+      iframe,
+      nomeCallback
+    ) {
+
+      if (
+        formulario &&
+        formulario.parentNode
+      ) {
+
+        formulario.remove();
+
+      }
+
+
+      if (
+        iframe &&
+        iframe.parentNode
+      ) {
+
+        iframe.remove();
+
+      }
+
+
+      try {
+
+        delete window[
+          nomeCallback
+        ];
+
+      } catch (erro) {
+
+        console.error(
+          erro
+        );
+
+      }
+
+    }
+
+
+    /*
+     * Check-in manual.
+     */
+    function testarCodigoManual() {
+
+      if (!dadosPreenchidos()) {
+        return;
+      }
+
+
+      const codigo =
+        document
+          .getElementById('codigoManual')
+          .value
+          .trim();
+
+
+      if (!codigo) {
+
+        mostrarResultado(
+          false,
+          'Digite um código.'
+        );
+
+        return;
+      }
+
+
+      enviarCheckin(
+        codigo
+      );
+
+    }
+
+
+    /*
+     * Mostra resultado normal.
+     */
+    function mostrarResultado(
+      sucesso,
+      mensagem
+    ) {
 
       const elemento =
-        document.getElementById('resultado');
+        document.getElementById(
+          'resultado'
+        );
 
-      elemento.style.display = "block";
+
+      elemento.style.display =
+        "block";
+
 
       elemento.className =
-        sucesso ? "sucesso" : "erro";
+        sucesso
+          ? "sucesso"
+          : "erro";
 
-      elemento.textContent = mensagem;
+
+      elemento.textContent =
+        mensagem;
+
+    }
+
+
+    /*
+     * Mostra mensagem enquanto
+     * aguardamos o Apps Script.
+     */
+    function mostrarResultadoAguardando(
+      mensagem
+    ) {
+
+      const elemento =
+        document.getElementById(
+          'resultado'
+        );
+
+
+      elemento.style.display =
+        "block";
+
+
+      elemento.className =
+        "aguardando";
+
+
+      elemento.textContent =
+        mensagem;
 
     }
 
