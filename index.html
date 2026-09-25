@@ -1,0 +1,305 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+  <title>Check-in do Evento</title>
+
+  <!-- Biblioteca para leitura de QR Code -->
+  <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+
+  <style>
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      padding: 20px;
+      font-family: Arial, sans-serif;
+      background: #f4f5f7;
+      color: #222;
+    }
+
+    .container {
+      max-width: 500px;
+      margin: 0 auto;
+      background: white;
+      padding: 25px;
+      border-radius: 18px;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.08);
+    }
+
+    h1 {
+      text-align: center;
+      margin-top: 0;
+      font-size: 26px;
+    }
+
+    .subtitulo {
+      text-align: center;
+      color: #666;
+      margin-bottom: 25px;
+    }
+
+    label {
+      display: block;
+      margin-top: 15px;
+      margin-bottom: 6px;
+      font-weight: bold;
+    }
+
+    input {
+      width: 100%;
+      padding: 14px;
+      border: 1px solid #ccc;
+      border-radius: 10px;
+      font-size: 16px;
+    }
+
+    button {
+      width: 100%;
+      padding: 15px;
+      margin-top: 18px;
+      border: none;
+      border-radius: 10px;
+      font-size: 17px;
+      font-weight: bold;
+      cursor: pointer;
+    }
+
+    #btnCamera {
+      background: #333;
+      color: white;
+    }
+
+    #reader {
+      width: 100%;
+      margin-top: 20px;
+    }
+
+    #resultado {
+      margin-top: 20px;
+      padding: 15px;
+      border-radius: 10px;
+      text-align: center;
+      font-weight: bold;
+      display: none;
+    }
+
+    .sucesso {
+      background: #dff5e3;
+      color: #176b2c;
+    }
+
+    .erro {
+      background: #fde2e2;
+      color: #a11a1a;
+    }
+
+    .manual {
+      margin-top: 30px;
+      padding-top: 20px;
+      border-top: 1px solid #ddd;
+    }
+
+    .manual button {
+      background: #e9e9e9;
+      color: #222;
+    }
+  </style>
+</head>
+
+<body>
+
+  <div class="container">
+
+    <h1>📱 Check-in</h1>
+
+    <div class="subtitulo">
+      Faça o check-in dos participantes pelo QR Code
+    </div>
+
+    <label for="operador">Nome do operador</label>
+    <input
+      type="text"
+      id="operador"
+      placeholder="Digite seu nome"
+    >
+
+    <label for="pin">PIN do evento</label>
+    <input
+      type="password"
+      id="pin"
+      placeholder="Digite o PIN"
+    >
+
+    <button id="btnCamera" onclick="ativarCamera()">
+      📷 Ativar câmera
+    </button>
+
+    <div id="reader"></div>
+
+    <div id="resultado"></div>
+
+    <div class="manual">
+
+      <label for="codigoManual">
+        Ou digite o código manualmente
+      </label>
+
+      <input
+        type="text"
+        id="codigoManual"
+        placeholder="Ex.: CHK-AB123CD456"
+      >
+
+      <button onclick="testarCodigoManual()">
+        Confirmar código
+      </button>
+
+    </div>
+
+  </div>
+
+  <script>
+
+    let leitor = null;
+
+    function dadosPreenchidos() {
+
+      const operador =
+        document.getElementById('operador').value.trim();
+
+      const pin =
+        document.getElementById('pin').value.trim();
+
+      if (!operador) {
+        mostrarResultado(false, 'Digite o nome do operador.');
+        return false;
+      }
+
+      if (!pin) {
+        mostrarResultado(false, 'Digite o PIN do evento.');
+        return false;
+      }
+
+      return true;
+    }
+
+
+    function ativarCamera() {
+
+      if (!dadosPreenchidos()) {
+        return;
+      }
+
+      if (leitor) {
+        mostrarResultado(false, 'A câmera já está ativa.');
+        return;
+      }
+
+      leitor = new Html5Qrcode("reader");
+
+      leitor.start(
+        { facingMode: "environment" },
+
+        {
+          fps: 10,
+          qrbox: {
+            width: 250,
+            height: 250
+          }
+        },
+
+        codigo => {
+
+          console.log("QR LIDO:", codigo);
+
+          mostrarResultado(
+            true,
+            "QR Code lido com sucesso: " + codigo
+          );
+
+          pararCamera();
+
+        },
+
+        erro => {
+          // Erros normais de leitura são ignorados.
+        }
+
+      ).catch(erro => {
+
+        console.error("ERRO DA CÂMERA:", erro);
+
+        leitor = null;
+
+        mostrarResultado(
+          false,
+          "Não foi possível acessar a câmera: " + erro
+        );
+
+      });
+    }
+
+
+    function pararCamera() {
+
+      if (!leitor) {
+        return;
+      }
+
+      leitor.stop()
+        .then(() => {
+          leitor.clear();
+          leitor = null;
+        })
+        .catch(erro => {
+          console.error("Erro ao parar câmera:", erro);
+        });
+
+    }
+
+
+    function testarCodigoManual() {
+
+      const codigo =
+        document.getElementById('codigoManual').value.trim();
+
+      if (!codigo) {
+        mostrarResultado(
+          false,
+          "Digite um código."
+        );
+
+        return;
+      }
+
+      mostrarResultado(
+        true,
+        "Código recebido: " + codigo
+      );
+
+    }
+
+
+    function mostrarResultado(sucesso, mensagem) {
+
+      const elemento =
+        document.getElementById('resultado');
+
+      elemento.style.display = "block";
+
+      elemento.className =
+        sucesso ? "sucesso" : "erro";
+
+      elemento.textContent = mensagem;
+
+    }
+
+  </script>
+
+</body>
+</html>
