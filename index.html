@@ -534,34 +534,33 @@
           .substring(2, 8);
 
 
-      window[nomeCallback] =
-        function(resultado) {
+     window[nomeCallback] =
+  function(resultado) {
 
-          limparConsulta(
-            formulario,
-            iframe,
-            nomeCallback
-          );
+    if (!resultado || !resultado.pronto) {
 
+      setTimeout(
+        consultar,
+        1000
+      );
 
-          if (!resultado || !resultado.pronto) {
-
-            mostrarResultado(
-              false,
-              'Não foi possível obter o resultado do check-in.'
-            );
-
-            return;
-          }
+      return;
+    }
 
 
-          mostrarResultado(
-            resultado.sucesso,
-            resultado.mensagem
-          );
+    limparConsulta(
+      formulario,
+      iframe,
+      nomeCallback
+    );
 
-        };
 
+    mostrarResultado(
+      resultado.sucesso,
+      resultado.mensagem
+    );
+
+  };
 
       function consultar() {
 
